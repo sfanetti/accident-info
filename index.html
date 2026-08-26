@@ -292,9 +292,28 @@
     .photo-thumb{min-height:180px;}
   }
 
+  /* opening context modal */
+  #intro-modal{position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;background:rgba(5,8,12,.78);backdrop-filter:blur(6px);padding:20px;}
+  #intro-card{width:min(680px,100%);max-height:min(82vh,720px);overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.55);padding:24px;}
+  #intro-card h1{margin:0 0 10px;font-size:26px;line-height:1.15;}
+  #intro-card p{margin:10px 0;color:var(--text-dim);line-height:1.55;font-size:14px;}
+  #intro-card .intro-emphasis{color:var(--text);}
+  #intro-card button{margin-top:14px;min-height:46px;border:0;border-radius:10px;padding:11px 18px;background:var(--amber);color:#18120a;font-weight:800;font-family:'JetBrains Mono',monospace;cursor:pointer;}
+  #intro-card button:hover{filter:brightness(1.06);}
+
 </style>
 </head>
 <body>
+
+<div id="intro-modal" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+  <div id="intro-card">
+    <h1 id="intro-title">Why this site exists</h1>
+    <p>This site documents lighting conditions along this public trail and surrounding recreational area, including the location of nonfunctioning or poorly functioning lights and the site of a serious nighttime bicycle accident.</p>
+    <p class="intro-emphasis">The goal is simple: have the lighting repaired and maintained, or make nighttime access restrictions and warnings clear enough that people are not unknowingly exposed to avoidable hazards.</p>
+    <p>The map includes photographs, video, GPS information, and the identified accident location. It is intended as a factual record of the conditions observed.</p>
+    <button id="intro-close" type="button">View the map</button>
+  </div>
+</div>
 
 <div id="map"></div>
 <div id="tile-status" style="display:none;position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:1200;background:#3a1f1f;border:1px solid #7a3a3a;color:#f2c4c4;padding:8px 14px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;max-width:80vw;text-align:center;"></div>
@@ -784,6 +803,15 @@ document.addEventListener('keydown', (e) => {
   if(e.key === 'ArrowLeft' && modalPhotos.length){ modalIndex=(modalIndex-1+modalPhotos.length)%modalPhotos.length; renderModalPhoto(); }
   if(e.key === '+' || e.key === '=') zoomModal(1.25);
   if(e.key === '-') zoomModal(1/1.25);
+});
+
+
+const introModal = document.getElementById('intro-modal');
+document.getElementById('intro-close').addEventListener('click', () => {
+  introModal.style.display = 'none';
+});
+introModal.addEventListener('click', (e) => {
+  if(e.target === introModal) introModal.style.display = 'none';
 });
 
 renderVideoGrid();
