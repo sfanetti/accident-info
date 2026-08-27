@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Malfunctioning Park Light Survey</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg: #0b0e14;
+    --panel: #12161f;
+    --panel-2: #171c27;
+    --line: #232a38;
+    --text: #e7e6e2;
+    --text-dim: #8b93a3;
+    --amber: #ffb238;
+    --amber-dim: #7a5a22;
+    --ok: #6fcf97;
+    --sodium: radial-gradient(circle, rgba(255,178,56,0.9) 0%, rgba(255,178,56,0.15) 55%, rgba(255,178,56,0) 75%);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;overflow:hidden;}
+
+  #map{position:absolute;inset:0;}
+
+  /* top bar */
+  #topbar{
+    position:absolute; top:0; left:0; right:0; z-index:1000;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 18px 14px 72px;
+    background:linear-gradient(180deg, rgba(11,14,20,0.92) 0%, rgba(11,14,20,0.0) 100%);
+    pointer-events:none;
+  }
+  #topbar .title{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px; letter-spacing:0.3px;
+    display:flex; align-items:center; gap:10px; pointer-events:auto;
+  }
+  #topbar .title .dot{width:10px;height:10px;border-radius:50%;background:var(--sodium);box-shadow:0 0 10px 2px rgba(255,178,56,0.7);}
+  #topbar .sub{font-size:12px;color:var(--text-dim);font-family:'JetBrains Mono',monospace;margin-top:2px;}
+  #progress-pill{
+    pointer-events:auto;
+    background:var(--panel); border:1px solid var(--line); border-radius:999px;
+    padding:8px 14px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-dim);
+    display:flex; align-items:center; gap:8px;
+  }
+  #progress-pill b{color:var(--amber); font-weight:600;}
+  #progress-bar{width:70px;height:4px;border-radius:2px;background:var(--line);overflow:hidden;}
+  #progress-fill{height:100%;background:var(--amber);width:0%;transition:width .3s ease;}
+
+  /* markers */
+  .lamp-marker{
+    width:26px;height:26px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;
+    border:2px solid #ffd27a; background:var(--amber); color:var(--bg);
+    box-shadow:0 0 7px 2px rgba(255,178,56,0.38);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .lamp-marker.tagged{
+    border-color:#ffe1a3; color:var(--bg); background:#ffc45c;
+    box-shadow:0 0 9px 2px rgba(255,178,56,0.52);
+  }
+  .lamp-marker.active{transform:scale(1.25);}
+  .leaflet-marker-icon{background:none;border:none;}
+
+  /* side panel */
+  #panel{
+    position:absolute; top:0; right:0; height:100%; width:340px; max-width:88vw;
+    background:var(--panel); border-left:1px solid var(--line); z-index:1100;
+    transform:translateX(100%); transition:transform .28s ease;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  #panel.open{transform:translateX(0);}
+  #panel-header{
+    padding:16px 18px; border-bottom:1px solid var(--line);
+    display:flex; align-items:flex-start; justify-content:space-between;
+  }
+  #panel-header .id{
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:22px;
+  }
+  #panel-header .meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:4px;line-height:1.6;}
+  #panel-close{background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;padding:2px 6px;line-height:1;}
+  #panel-close:hover{color:var(--text);}
+  #panel-body{flex:1;overflow-y:auto;padding:16px 18px;}
+
+  .field-label{font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:8px;font-weight:600;}
+
+  #photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+  .photo-thumb{position:relative;aspect-ratio:4/3;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:var(--panel-2);}
+  .photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .photo-thumb .missing-label{display:none;position:absolute;inset:0;align-items:center;justify-content:center;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);padding:6px;line-height:1.5;}
+  .photo-thumb.missing img{display:none;}
+  .photo-thumb.missing .missing-label{display:flex;}
+  .photo-thumb.missing{border-style:dashed;border-color:var(--line);}
+  .photo-thumb button{
+    position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;
+    background:rgba(11,14,20,0.8);border:1px solid var(--line);color:var(--text);
+    font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+
+  #upload-zone{
+    border:1.5px dashed var(--line); border-radius:8px; padding:18px 12px;
+    text-align:center; cursor:pointer; color:var(--text-dim); font-size:13px;
+    margin-bottom:20px; transition:border-color .15s ease, color .15s ease;
+  }
+  #upload-zone:hover{border-color:var(--amber-dim); color:var(--text);}
+  #upload-zone input{display:none;}
+  #upload-zone .icon{font-size:20px;display:block;margin-bottom:6px;}
+
+  .info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px;}
+  .info-row:last-child{border-bottom:none;}
+  .info-row .k{color:var(--text-dim);}
+  .info-row .v{font-family:'JetBrains Mono',monospace;font-size:12px;}
+
+  #filename-list{margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim);line-height:1.8;}
+
+  /* list toggle (mobile-friendly cluster list) */
+  #list-toggle{
+    position:absolute; bottom:18px; left:18px; z-index:1000;
+    background:var(--panel); border:1px solid var(--line); border-radius:999px;
+    padding:10px 16px; font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text);
+    cursor:pointer; display:flex; align-items:center; gap:8px;
+  }
+  #list-toggle:hover{border-color:var(--amber-dim);}
+
+  #cluster-list{
+    position:absolute; bottom:64px; left:18px; z-index:1000; width:260px; max-height:50vh;
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    overflow-y:auto; display:none;
+  }
+  #cluster-list.open{display:block;}
+  .cl-item{
+    padding:9px 14px; border-bottom:1px solid var(--line); cursor:pointer;
+    display:flex; align-items:center; justify-content:space-between; font-size:12px;
+  }
+  .cl-item:last-child{border-bottom:none;}
+  .cl-item:hover{background:var(--panel-2);}
+  .cl-item .n{font-family:'JetBrains Mono',monospace;color:var(--text-dim);}
+  .cl-item .status{width:7px;height:7px;border-radius:50%;background:var(--line);}
+  .cl-item .status.tagged{background:var(--amber);box-shadow:0 0 6px 1px rgba(255,178,56,0.7);}
+
+  ::-webkit-scrollbar{width:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px;}
+
+  .leaflet-popup-content-wrapper{background:var(--panel);color:var(--text);border-radius:8px;}
+  .leaflet-popup-tip{background:var(--panel);}
+  .leaflet-popup-content{font-family:'JetBrains Mono',monospace;font-size:12px;margin:10px 12px;}
+  .leaflet-control-zoom a{background:var(--panel) !important;color:var(--text) !important;border-color:var(--line) !important;}
+  .leaflet-control-attribution{background:rgba(11,14,20,0.8) !important;color:var(--text-dim) !important;}
+  .leaflet-control-attribution a{color:var(--text-dim) !important;}
+  .leaflet-control-layers{background:var(--panel) !important;border:1px solid var(--line) !important;color:var(--text) !important;border-radius:8px !important;}
+  .leaflet-control-layers-toggle{filter:invert(1) brightness(1.6);}
+  .leaflet-control-layers-expanded{padding:10px 12px !important;font-family:'JetBrains Mono',monospace;font-size:12px;}
+  .leaflet-control-layers label{margin-bottom:6px;display:block;}
+
+
+  .crash-marker{
+    width:26px;height:26px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:700;color:#fff;
+    background:#c23b3b; border:2px solid #ffd8d8;
+    box-shadow:0 0 12px 3px rgba(194,59,59,0.6);
+  }
+
+  /* media tabs */
+  .media-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--line);padding-bottom:8px;}
+  .media-tab{
+    appearance:none;border:1px solid var(--line);background:var(--panel-2);color:var(--text-dim);
+    border-radius:999px;padding:7px 12px;font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;
+  }
+  .media-tab:hover{color:var(--text);border-color:var(--amber-dim);}
+  .media-tab.active{background:var(--amber);border-color:var(--amber);color:var(--bg);font-weight:600;}
+  .media-pane{display:none;}
+  .media-pane.active{display:block;}
+  #video-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:16px;}
+  .video-card{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel-2);}
+  .video-card video{width:100%;display:block;background:#000;max-height:210px;}
+  .video-name{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);padding:7px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .video-missing{display:none;padding:24px 10px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);}
+  #video-empty{font-size:12px;color:var(--text-dim);padding:10px 0 18px;}
+
+  /* full-screen photo lightbox */
+  #photo-modal{
+    position:fixed; inset:0; z-index:3000; display:none; flex-direction:column;
+    background:rgba(5,7,10,0.97); color:var(--text);
+  }
+  #photo-modal.open{display:flex;}
+  #photo-modal-toolbar{
+    position:absolute; top:14px; right:14px; z-index:3010; display:flex; gap:8px;
+  }
+  .modal-btn{
+    width:40px;height:40px;border-radius:999px;border:1px solid var(--line);
+    background:rgba(18,22,31,0.9);color:var(--text);font-size:20px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .modal-btn:hover{border-color:var(--amber-dim);}
+  #photo-modal-stage{
+    flex:1; min-height:0; position:relative; overflow:hidden; display:flex;
+    align-items:center; justify-content:center; touch-action:none; cursor:grab;
+  }
+  #photo-modal-stage.dragging{cursor:grabbing;}
+  #photo-modal-image{
+    max-width:100%; max-height:100%; object-fit:contain; user-select:none; -webkit-user-drag:none;
+    transform-origin:center center; will-change:transform;
+  }
+  #photo-modal-missing{
+    display:none; text-align:center; color:var(--text-dim); font-family:'JetBrains Mono',monospace;
+    padding:24px; line-height:1.6;
+  }
+  #photo-modal-caption{
+    position:absolute; left:18px; top:18px; z-index:3010;
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text-dim);
+    background:rgba(11,14,20,0.72); border:1px solid var(--line); border-radius:8px; padding:8px 10px;
+  }
+  #photo-carousel{
+    flex:0 0 auto; display:flex; gap:8px; overflow-x:auto; padding:10px 14px 14px;
+    border-top:1px solid var(--line); background:rgba(11,14,20,0.96);
+  }
+  .carousel-thumb{
+    flex:0 0 92px; height:68px; border-radius:7px; overflow:hidden; border:2px solid transparent;
+    background:var(--panel-2); cursor:pointer; position:relative; padding:0;
+  }
+  .carousel-thumb.active{border-color:var(--amber);}
+  .carousel-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .carousel-thumb .carousel-missing{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+    font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);padding:4px;
+  }
+  .photo-thumb{cursor:zoom-in;}
+
+  @media (max-width:600px){
+    #topbar{padding-left:70px;padding-right:10px;}
+    #topbar .title{font-size:15px;}
+    #topbar .sub{font-size:10px;}
+    #progress-pill{display:none;}
+    #photo-modal-caption{left:10px;top:10px;max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    #photo-modal-toolbar{top:10px;right:10px;}
+    .carousel-thumb{flex-basis:78px;height:58px;}
+  }
+
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+<div id="tile-status" style="display:none;position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:1200;background:#3a1f1f;border:1px solid #7a3a3a;color:#f2c4c4;padding:8px 14px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;max-width:80vw;text-align:center;"></div>
+
+<div id="topbar">
+  <div>
+    <div class="title"><span class="dot"></span>Malfunctioning Park Light Survey</div>
+    <div class="sub">Aug 22 2026 &middot; 29 survey locations logged</div>
+  </div>
+  <div id="progress-pill">
+    <span><b id="tagged-count">0</b>/29 tagged</span>
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+  </div>
+</div>
+
+<div id="list-toggle" onclick="toggleList()">☰ Location list</div>
+<div id="cluster-list"></div>
+
+<div id="panel">
+  <div id="panel-header">
+    <div>
+      <div class="id" id="ph-id">—</div>
+      <div class="meta" id="ph-meta"></div>
+    </div>
+    <button id="panel-close" onclick="closePanel()">✕</button>
+  </div>
+  <div id="panel-body">
+    <div class="media-tabs" role="tablist" aria-label="Location media">
+      <button class="media-tab active" id="photos-tab" role="tab" aria-selected="true" onclick="switchMediaTab('photos')">Photos</button>
+      <button class="media-tab" id="videos-tab" role="tab" aria-selected="false" onclick="switchMediaTab('videos')">Videos <span id="video-count"></span></button>
+    </div>
+
+    <div class="media-pane active" id="photos-pane" role="tabpanel">
+      <div id="photo-grid"></div>
+      <label id="upload-zone">
+        <span class="icon">＋</span>
+        Attach extra photo
+        <input type="file" id="file-input" accept="image/*" capture="environment" multiple />
+      </label>
+    </div>
+
+    <div class="media-pane" id="videos-pane" role="tabpanel">
+      <div id="video-grid"></div>
+    </div>
+
+    <div class="field-label">Location info</div>
+    <div id="info-rows"></div>
+    <div id="filename-list"></div>
+  </div>
+</div>
+
+
+<div id="photo-modal" aria-hidden="true">
+  <div id="photo-modal-caption"></div>
+  <div id="photo-modal-toolbar">
+    <button class="modal-btn" id="zoom-out" title="Zoom out">−</button>
+    <button class="modal-btn" id="zoom-reset" title="Reset zoom">1:1</button>
+    <button class="modal-btn" id="zoom-in" title="Zoom in">＋</button>
+    <button class="modal-btn" id="photo-modal-close" title="Close">✕</button>
+  </div>
+  <div id="photo-modal-stage">
+    <img id="photo-modal-image" alt="Park light survey photo" />
+    <div id="photo-modal-missing"></div>
+  </div>
+  <div id="photo-carousel"></div>
+</div>
+
+<script>
+const CLUSTERS = [{"id": 1, "lat": 33.94899, "lng": -81.029425, "shots": 1, "filenames": ["20260822_205637.jpg"], "first_seen": "2026:08:22 20:56:37"}, {"id": 2, "lat": 33.949116, "lng": -81.029267, "shots": 2, "filenames": ["20260822_205735.jpg", "20260822_205751.jpg"], "first_seen": "2026:08:22 20:57:37"}, {"id": 3, "lat": 33.947528, "lng": -81.028151, "shots": 2, "filenames": ["20260822_210221.jpg", "20260822_210229.jpg"], "first_seen": "2026:08:22 21:02:23"}, {"id": 4, "lat": 33.945695, "lng": -81.027292, "shots": 1, "filenames": ["20260822_210604.jpg"], "first_seen": "2026:08:22 21:06:06"}, {"id": 5, "lat": 33.945355, "lng": -81.027094, "shots": 1, "filenames": ["20260822_210704.jpg"], "first_seen": "2026:08:22 21:07:06"}, {"id": 6, "lat": 33.944875, "lng": -81.026935, "shots": 1, "filenames": ["20260822_210819.jpg"], "first_seen": "2026:08:22 21:08:21"}, {"id": 7, "lat": 33.943189, "lng": -81.026139, "shots": 3, "filenames": ["20260822_211140.jpg", "20260822_211148.jpg", "20260822_211157.jpg"], "first_seen": "2026:08:22 21:11:42"}, {"id": 8, "lat": 33.942884, "lng": -81.025893, "shots": 2, "filenames": ["20260822_211252.jpg", "20260822_211305.jpg"], "first_seen": "2026:08:22 21:12:54"}, {"id": 9, "lat": 33.942512, "lng": -81.0259, "shots": 1, "filenames": ["20260822_211428.jpg"], "first_seen": "2026:08:22 21:14:31"}, {"id": 10, "lat": 33.941781, "lng": -81.025646, "shots": 1, "filenames": ["20260822_211556.jpg"], "first_seen": "2026:08:22 21:15:58"}, {"id": 11, "lat": 33.940603, "lng": -81.027656, "shots": 3, "filenames": ["20260822_212021.jpg", "20260822_212031.jpg", "20260822_212035.jpg"], "first_seen": "2026:08:22 21:20:23"}, {"id": 12, "lat": 33.939158, "lng": -81.030392, "shots": 1, "filenames": ["20260822_212607.jpg"], "first_seen": "2026:08:22 21:26:09"}, {"id": 13, "lat": 33.9395, "lng": -81.031012, "shots": 1, "filenames": ["20260822_212731.jpg"], "first_seen": "2026:08:22 21:27:34"}, {"id": 14, "lat": 33.939093, "lng": -81.032002, "shots": 2, "filenames": ["20260822_212910.jpg", "20260822_212919.jpg"], "first_seen": "2026:08:22 21:29:13"}, {"id": 15, "lat": 33.937663, "lng": -81.033831, "shots": 1, "filenames": ["20260822_213344.jpg"], "first_seen": "2026:08:22 21:33:46"}, {"id": 16, "lat": 33.937776, "lng": -81.034329, "shots": 2, "filenames": ["20260822_213453.jpg", "20260822_213503.jpg"], "first_seen": "2026:08:22 21:34:55"}, {"id": 17, "lat": 33.938576, "lng": -81.034622, "shots": 3, "filenames": ["20260822_213638.jpg", "20260822_213646.jpg", "20260822_213652.jpg"], "first_seen": "2026:08:22 21:36:40"}, {"id": 18, "lat": 33.938709, "lng": -81.035949, "shots": 1, "filenames": ["20260822_213940.jpg"], "first_seen": "2026:08:22 21:39:42"}, {"id": 19, "lat": 33.938891, "lng": -81.036331, "shots": 1, "filenames": ["20260822_214053.jpg"], "first_seen": "2026:08:22 21:40:56"}, {"id": 20, "lat": 33.93612, "lng": -81.035221, "shots": 1, "filenames": ["20260822_214718.jpg"], "first_seen": "2026:08:22 21:47:20"}, {"id": 21, "lat": 33.935443, "lng": -81.035117, "shots": 1, "filenames": ["20260822_214835.jpg"], "first_seen": "2026:08:22 21:48:38"}, {"id": 22, "lat": 33.935104, "lng": -81.034899, "shots": 2, "filenames": ["20260822_214957.jpg", "20260822_215003.jpg"], "first_seen": "2026:08:22 21:49:59"}, {"id": 23, "lat": 33.935106, "lng": -81.032894, "shots": 4, "filenames": ["20260822_215451.jpg", "20260822_215459.jpg", "20260822_215507.jpg", "20260822_215554.jpg"], "first_seen": "2026:08:22 21:54:54"}, {"id": 24, "lat": 33.935407, "lng": -81.032679, "shots": 1, "filenames": ["20260822_215558.jpg"], "first_seen": "2026:08:22 21:56:00"}, {"id": 25, "lat": 33.936539, "lng": -81.032092, "shots": 2, "filenames": ["20260822_215836.jpg", "20260822_215844.jpg"], "first_seen": "2026:08:22 21:58:38"}, {"id": 26, "lat": 33.937662, "lng": -81.032098, "shots": 1, "filenames": ["20260822_220147.jpg"], "first_seen": "2026:08:22 22:01:50"}, {"id": 27, "lat": 33.938132, "lng": -81.031216, "shots": 1, "filenames": ["20260822_220344.jpg"], "first_seen": "2026:08:22 22:03:46"}, {"id": 28, "lat": 33.937992, "lng": -81.029193, "shots": 1, "filenames": ["20260822_220716.jpg"], "first_seen": "2026:08:22 22:07:18"}, {"id": 29, "lat": 33.938884, "lng": -81.028122, "shots": 1, "filenames": ["20260822_220930.jpg"], "first_seen": "2026:08:22 22:09:32"}];
+const MARKERS_SPECIAL = [
+  { id: 'crash', lat: 33.9471807, lng: -81.0280709, label: 'Crash site' }
+];
+
+let map, markers = {}, activeId = null;
+const STORAGE_PREFIX = 'lights:';
+
+// Video files previously supplied with this survey. A standalone HTML page cannot
+// enumerate a local images/ directory, so these paths are explicitly referenced here.
+const DRIVE_PHOTO_IDS = {
+  '20260822_205637.jpg':'18U_RbzEL7oBs9WQv8VIlfCI3Dj_LGfvz',
+  '20260822_205735.jpg':'1yttyMOwmea4BiSLMqdpQzuBFT11jNBtm',
+  '20260822_205751.jpg':'1LB57t-u9sOrk4Bt4NDWtGHhlnpeEfi9f',
+  '20260822_210221.jpg':'17jWlj1h3t7uUgXPxUxCvsj0ztw7SDsI3',
+  '20260822_210229.jpg':'15wub54QHY7c6n27ukddIQzPnsEMubSoo',
+  '20260822_210604.jpg':'1cKiDic3y9yyNr5U0oSK4jtjURwcDt_jA',
+  '20260822_210704.jpg':'1mKHasn5TZtpiegl-h-hj9sxmoiAGGAkb',
+  '20260822_210819.jpg':'1VLgpO4GHqN3xf2JGl52Ys926nol3j5H7',
+  '20260822_211140.jpg':'1bVppprE-Z5nP9eCzxa5fniNtbt900NVP',
+  '20260822_211148.jpg':'1aX6Fac-34UE5-6MdcEZ-1v8loIu15kIA',
+  '20260822_211157.jpg':'1xuy6GePxMvaRr-J51Y5EN6YfsyGgMSt4',
+  '20260822_211252.jpg':'1OPhXgt16XYnBFt4Ugt3eoGFg1kVoTKDl',
+  '20260822_211305.jpg':'1ICedv9NNAtVaGhg0KU10eRFaA7zpKHzV',
+  '20260822_211428.jpg':'1vdITUpsN8dfmxXMtY8O4Z3JIXPdyjyRP',
+  '20260822_211556.jpg':'1UM1VhMysWRiqoEdg4YTcG3C2tTImzDw0',
+  '20260822_212021.jpg':'1tIs4_xLd-DQpINcFPy6GIehjWx9ueaiQ',
+  '20260822_212031.jpg':'1EJH7IXDHVTjfgO20QnnRoXLcPLOHFZnB',
+  '20260822_212035.jpg':'1XM8v7V2WnzKozzozfE5pQ0Q-QxtgruLT',
+  '20260822_212607.jpg':'1W8p2SiDTYyydOGjlbO7loxkIS5l3lqmL',
+  '20260822_212731.jpg':'1EeVOM5ofUQkBFRcX2whEVDbzZoKMsMPo',
+  '20260822_212910.jpg':'1gsMW1J9AMqqL-EqxRfKYsjwUXabjU5La',
+  '20260822_212919.jpg':'1cmOBaTRa7exDDOr1gRuj4AnqZPfQroH_',
+  '20260822_213344.jpg':'1P-RINZnigfHcHiKfST-YYn8CIlZmFCU7',
+  '20260822_213453.jpg':'1xns1FOq49guXmFYiSxo5bpww6sKHzIJH',
+  '20260822_213503.jpg':'147wwLf9wRR2Bm-5fFWjnJPHylF6gFZ3k',
+  '20260822_213638.jpg':'1pMguMm6n_UV-7CRGI_lV6Atw2TDQiX-P',
+  '20260822_213646.jpg':'1ScHo8IJzR9o1MS7rDR4GCgp_ziVdOkcX',
+  '20260822_213652.jpg':'1UvdoD8krOOC1EhJH5deUDIzXs9xQOyfs',
+  '20260822_213940.jpg':'1wXAwzQV5mBcEMQ2eVqUlJ1mUHFZ5OpQ6',
+  '20260822_214053.jpg':'1pJoZTGvHUnnO2Bdhk_5WwPRPGkRSKF_S',
+  '20260822_214718.jpg':'1SmPjixwc23ySRjKwNxFu-Ob-tfQgOKm5',
+  '20260822_214835.jpg':'1V2QQlS7e6y_1wjlgOmGxFvArAeC1pDaQ',
+  '20260822_214957.jpg':'1YZYObvf_-KeWeiElUnecPnHtnBl60qPy',
+  '20260822_215003.jpg':'1KW5XBhoiGyG9uYr4RuGGDppFWRL6ltY7',
+  '20260822_215451.jpg':'19cBjiYZCDu8dPxp-ZArso_p0XM4WivZX',
+  '20260822_215459.jpg':'1Xd-_wKtcaYD_bjg4srfphILZEMQt-cCa',
+  '20260822_215507.jpg':'1CltCTyAnWLwyHFieOyUsUmthu9ia-Ud0',
+  '20260822_215554.jpg':'15OfY7-xPwRBaa1da0CkrCfZcJlUAxYUE',
+  '20260822_215558.jpg':'1bd-2j6hspCTGSihnNPD6UNlMAXOTn-Au',
+  '20260822_215836.jpg':'1bhfaG9xcOU935zzDrKwLLD2zMcrtAU-F',
+  '20260822_215844.jpg':'1HisfxvdgdzECLtYqbxaz5NYiapUp9249',
+  '20260822_220147.jpg':'1zQLz66oSvHNXxLttsscbQK4FeIO4OLDl',
+  '20260822_220344.jpg':'1oPdO1mUfBsylQlCsl338ABwDcBWShpB1',
+  '20260822_220716.jpg':'1yeNmqLaD32Cx3gHsXSAbW_2kdKLRUi1P',
+  '20260822_220930.jpg':'1B9kxJepomJT30vWjdiqlCvhSQVPm6n2w'
+};
+
+function drivePhotoUrl(src){
+  const name = src.split('/').pop();
+  const id = DRIVE_PHOTO_IDS[name];
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w2400` : null;
+}
+
+function useDriveFallback(img){
+  if(img.dataset.driveFallbackTried === '1') return false;
+  const fallback = drivePhotoUrl(img.dataset.originalSrc || img.getAttribute('src') || '');
+  if(!fallback) return false;
+  img.dataset.driveFallbackTried = '1';
+  img.src = fallback;
+  return true;
+}
+
+const DRIVE_VIDEO_IDS = {
+  '20260822_223008.mp4':'1Dn3nyG__5kuWxM96bWZVMVcLua3ToZIe',
+  '20260822_222849.mp4':'1UV2oYxgiSoKZbYx7wbMgsF_Nx1WDvcfy',
+  '20260822_222756.mp4':'1VtnLRirGMVtyfaDYkJZXcpZMRuBCBaxV',
+  '20260822_221653.mp4':'1PhFOxIszt9MMbJQ7aDqaV1YSqhdWRcbp',
+  '20260822_205555.mp4':'1wnVeNCcYMSxC5LxsVmrmR6E7UOiQDhJq'
+};
+
+function driveVideoPreviewUrl(name){
+  const id = DRIVE_VIDEO_IDS[name];
+  return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+}
+
+function useDriveVideoFallback(video, name){
+  if(video.dataset.driveFallbackTried === '1') return;
+  video.dataset.driveFallbackTried = '1';
+  const fallback = driveVideoPreviewUrl(name);
+  if(!fallback){
+    video.style.display = 'none';
+    video.nextElementSibling.style.display = 'block';
+    return;
+  }
+  const frame = document.createElement('iframe');
+  frame.src = fallback;
+  frame.allow = 'autoplay; fullscreen';
+  frame.allowFullscreen = true;
+  frame.loading = 'lazy';
+  frame.title = name;
+  frame.style.width = '100%';
+  frame.style.aspectRatio = '16 / 9';
+  frame.style.border = '0';
+  frame.style.background = '#000';
+  video.replaceWith(frame);
+}
+
+const VIDEO_FILES = [
+  '20260822_223008.mp4',
+  '20260822_222849.mp4',
+  '20260822_222756.mp4',
+  '20260822_221653.mp4',
+  '20260822_205555.mp4'
+];
+
+
+function initMap(){
+  map = L.map('map', { zoomControl: true, attributionControl: true }).setView([33.9405, -81.0305], 15);
+
+  const street = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19, subdomains: 'abc'
+  });
+  const terrain = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors, SRTM &copy; OpenTopoMap (CC-BY-SA)',
+    maxZoom: 17, subdomains: 'abc'
+  });
+  const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Esri, Maxar, Earthstar Geographics',
+    maxZoom: 19
+  });
+
+  let tileErrorCount = 0;
+  let tileLoadedCount = 0;
+  const banner = document.getElementById('tile-status');
+  [street, terrain, satellite].forEach(layer => {
+    layer.on('tileerror', () => {
+      tileErrorCount++;
+      banner.style.display = 'block';
+      banner.textContent = `⚠ Map tiles failing to load (${tileErrorCount} errors) — likely a network restriction in this environment.`;
+    });
+    layer.on('tileload', () => {
+      tileLoadedCount++;
+      if(tileLoadedCount === 1){ banner.style.display = 'none'; }
+    });
+  });
+
+  satellite.addTo(map);
+  L.control.layers({
+    'Satellite': satellite,
+    'Terrain': terrain,
+    'Street': street
+  }, null, {position:'topright', collapsed:true}).addTo(map);
+
+  const bounds = [];
+  CLUSTERS.forEach(c => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="lamp-marker" id="marker-${c.id}" title="${locationLabel(c)}">${markerLabel(c)}</div>`,
+      iconSize: [26,26], iconAnchor:[13,13]
+    });
+    const m = L.marker([c.lat, c.lng], {icon}).addTo(map);
+    m.on('click', () => openPanel(c.id));
+    markers[c.id] = m;
+    bounds.push([c.lat, c.lng]);
+  });
+  map.fitBounds(bounds, {padding:[60,60]});
+
+  MARKERS_SPECIAL.forEach(s => {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="crash-marker" title="${s.label}">✕</div>`,
+      iconSize: [26,26], iconAnchor:[13,13]
+    });
+    L.marker([s.lat, s.lng], {icon}).bindPopup(s.label).addTo(map);
+    bounds.push([s.lat, s.lng]);
+  });
+  map.fitBounds(bounds, {padding:[60,60]});
+
+  buildList();
+  refreshAllMarkerStates();
+}
+
+function locationLabel(c){
+  if(c.id === 1) return 'Park Entrance';
+  if(c.id === 2) return 'Additional Entrance Signage';
+  return `Park Light #${c.id - 2}`;
+}
+
+function markerLabel(c){
+  if(c.id === 1) return 'E';
+  if(c.id === 2) return 'S';
+  return String(c.id - 2);
+}
+
+function buildList(){
+  const el = document.getElementById('cluster-list');
+  el.innerHTML = CLUSTERS.map(c => `
+    <div class="cl-item" onclick="focusCluster(${c.id})">
+      <span class="n">${locationLabel(c)} &middot; ${c.shots} photo${c.shots>1?'s':''}</span>
+      <span class="status" id="liststatus-${c.id}"></span>
+    </div>`).join('');
+}
+
+function toggleList(){
+  document.getElementById('cluster-list').classList.toggle('open');
+}
+
+function focusCluster(id){
+  const c = CLUSTERS.find(x=>x.id===id);
+  map.flyTo([c.lat, c.lng], 18, {duration:0.6});
+  openPanel(id);
+}
+
+function defaultPaths(c){
+  return c.filenames.map(f => 'images/' + f);
+}
+
+// extra photos a user manually attaches beyond the default images/ folder set
+async function getExtraPhotos(id){
+  try{
+    const res = await window.storage.get(STORAGE_PREFIX + id, false);
+    return res && res.value ? JSON.parse(res.value) : [];
+  }catch(e){ return []; }
+}
+
+async function setExtraPhotos(id, photos){
+  try{
+    await window.storage.set(STORAGE_PREFIX + id, JSON.stringify(photos), false);
+  }catch(e){ console.error('storage set failed', e); }
+}
+
+// checks whether images/<filename> actually resolves, without waiting on the panel to open
+function checkImageExists(src){
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => {
+      const fallback = drivePhotoUrl(src);
+      if(!fallback) return resolve(false);
+      const driveImg = new Image();
+      driveImg.onload = () => resolve(true);
+      driveImg.onerror = () => resolve(false);
+      driveImg.src = fallback;
+    };
+    img.src = src;
+  });
+}
+
+const photoFoundState = {}; // id -> bool, whether at least one default image resolved
+
+async function refreshAllMarkerStates(){
+  await Promise.all(CLUSTERS.map(async c => {
+    const results = await Promise.all(defaultPaths(c).map(checkImageExists));
+    const found = results.some(Boolean);
+    photoFoundState[c.id] = found;
+    updateMarkerState(c.id, found);
+  }));
+  updateProgress();
+}
+
+function updateMarkerState(id, tagged){
+  const el = document.getElementById(`marker-${id}`);
+  if(el) el.classList.toggle('tagged', tagged);
+  const li = document.getElementById(`liststatus-${id}`);
+  if(li) li.classList.toggle('tagged', tagged);
+}
+
+function updateProgress(){
+  const count = CLUSTERS.filter(c => photoFoundState[c.id]).length;
+  document.getElementById('tagged-count').textContent = count;
+  document.getElementById('progress-fill').style.width = Math.round(count/CLUSTERS.length*100) + '%';
+}
+
+async function openPanel(id){
+  activeId = id;
+  const c = CLUSTERS.find(x=>x.id===id);
+  document.querySelectorAll('.lamp-marker').forEach(el=>el.classList.remove('active'));
+  const el = document.getElementById(`marker-${id}`);
+  if(el) el.classList.add('active');
+
+  document.getElementById('ph-id').textContent = locationLabel(c);
+  document.getElementById('ph-meta').textContent = `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}`;
+
+  document.getElementById('info-rows').innerHTML = `
+    <div class="info-row"><span class="k">First logged</span><span class="v">${c.first_seen.replace(':','-').replace(':','-')}</span></div>
+    <div class="info-row"><span class="k">GPS pings</span><span class="v">${c.shots}</span></div>
+    <div class="info-row"><span class="k">Coordinates</span><span class="v">${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}</span></div>
+  `;
+  document.getElementById('filename-list').innerHTML =
+    `<div class="field-label" style="margin-top:14px">Expected in /images</div>` +
+    c.filenames.map(f => `<div>${f}</div>`).join('');
+
+  switchMediaTab('photos');
+  await renderPhotoGrid(id);
+  renderVideoGrid();
+  document.getElementById('panel').classList.add('open');
+}
+
+function closePanel(){
+  document.getElementById('panel').classList.remove('open');
+  document.querySelectorAll('.lamp-marker').forEach(el=>el.classList.remove('active'));
+  activeId = null;
+}
+
+function switchMediaTab(tab){
+  const photos = tab === 'photos';
+  document.getElementById('photos-tab').classList.toggle('active', photos);
+  document.getElementById('videos-tab').classList.toggle('active', !photos);
+  document.getElementById('photos-tab').setAttribute('aria-selected', String(photos));
+  document.getElementById('videos-tab').setAttribute('aria-selected', String(!photos));
+  document.getElementById('photos-pane').classList.toggle('active', photos);
+  document.getElementById('videos-pane').classList.toggle('active', !photos);
+}
+
+function renderVideoGrid(){
+  const grid = document.getElementById('video-grid');
+  document.getElementById('video-count').textContent = `(${VIDEO_FILES.length})`;
+  if(!VIDEO_FILES.length){
+    grid.innerHTML = '<div id="video-empty">No referenced videos.</div>';
+    return;
+  }
+  grid.innerHTML = VIDEO_FILES.map(name => {
+    const src = 'videos/' + name;
+    return `
+      <div class="video-card">
+        <video controls preload="metadata" playsinline src="${src}" onerror="useDriveVideoFallback(this, ${JSON.stringify(name)})"></video>
+        <div class="video-missing">${name}<br>not available from GitHub or Google Drive</div>
+        <div class="video-name">${name}</div>
+      </div>`;
+  }).join('');
+}
+
+async function renderPhotoGrid(id){
+  const c = CLUSTERS.find(x=>x.id===id);
+  const extras = await getExtraPhotos(id);
+  const grid = document.getElementById('photo-grid');
+
+  const defaultThumbs = defaultPaths(c).map(path => `
+    <div class="photo-thumb" onclick="openPhotoModal(${id}, '${path.replace(/'/g, "\\'")}')">
+      <img src="${path}" data-original-src="${path}" data-drive-fallback-tried="0" onerror="if(!useDriveFallback(this)) this.closest('.photo-thumb').classList.add('missing')" />
+      <div class="missing-label">${path.split('/').pop()}<br>not available</div>
+    </div>
+  `).join('');
+
+  const extraThumbs = extras.map((p, idx) => `
+    <div class="photo-thumb" onclick="openPhotoModal(${id}, ${JSON.stringify(p)})">
+      <img src="${p}" />
+      <button onclick="event.stopPropagation(); removeExtraPhoto(${id}, ${idx})">✕</button>
+    </div>
+  `).join('');
+
+  grid.innerHTML = defaultThumbs + extraThumbs;
+}
+
+async function removeExtraPhoto(id, idx){
+  const photos = await getExtraPhotos(id);
+  photos.splice(idx, 1);
+  await setExtraPhotos(id, photos);
+  await renderPhotoGrid(id);
+  updateProgress();
+}
+
+// resize/compress before storing so images stay well under the 5MB per-key limit
+function compressImage(file, maxDim=1280, quality=0.72){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let {width, height} = img;
+        if(width > height && width > maxDim){ height = height*(maxDim/width); width = maxDim; }
+        else if(height > maxDim){ width = width*(maxDim/height); height = maxDim; }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById('file-input').addEventListener('change', async (e) => {
+  if(activeId === null) return;
+  const files = Array.from(e.target.files);
+  if(!files.length) return;
+  const zone = document.getElementById('upload-zone');
+  const originalText = zone.innerHTML;
+  zone.innerHTML = '<span class="icon">⋯</span>Processing…';
+
+  const photos = await getExtraPhotos(activeId);
+  for(const f of files){
+    try{
+      const dataUrl = await compressImage(f);
+      photos.push(dataUrl);
+    }catch(err){ console.error('failed to process image', err); }
+  }
+  await setExtraPhotos(activeId, photos);
+  await renderPhotoGrid(activeId);
+  updateProgress();
+
+  zone.innerHTML = originalText;
+  e.target.value = '';
+});
+
+
+let modalPhotos = [];
+let modalIndex = 0;
+let modalScale = 1;
+let modalX = 0;
+let modalY = 0;
+let dragStart = null;
+const modalPointers = new Map();
+let pinchStartDistance = 0;
+let pinchStartScale = 1;
+let pinchStartCenter = null;
+let pinchStartOffset = null;
+
+async function photosForSite(id){
+  const c = CLUSTERS.find(x=>x.id===id);
+  const extras = await getExtraPhotos(id);
+  return [
+    ...defaultPaths(c).map(src => ({src, name: src.split('/').pop()})),
+    ...extras.map((src, i) => ({src, name: `Attached photo ${i+1}`}))
+  ];
+}
+
+async function openPhotoModal(id, src){
+  modalPhotos = await photosForSite(id);
+  modalIndex = Math.max(0, modalPhotos.findIndex(p => p.src === src));
+  document.getElementById('photo-modal').classList.add('open');
+  document.getElementById('photo-modal').setAttribute('aria-hidden','false');
+  document.body.style.overflow = 'hidden';
+  renderModalPhoto();
+}
+
+function closePhotoModal(){
+  document.getElementById('photo-modal').classList.remove('open');
+  document.getElementById('photo-modal').setAttribute('aria-hidden','true');
+  document.body.style.overflow = '';
+  resetModalTransform();
+}
+
+function renderModalPhoto(){
+  const photo = modalPhotos[modalIndex];
+  if(!photo) return;
+  const img = document.getElementById('photo-modal-image');
+  const missing = document.getElementById('photo-modal-missing');
+  document.getElementById('photo-modal-caption').textContent = `${modalIndex+1} / ${modalPhotos.length} · ${photo.name}`;
+  resetModalTransform();
+  missing.style.display = 'none';
+  img.style.display = 'block';
+  img.dataset.originalSrc = photo.src;
+  img.dataset.driveFallbackTried = '0';
+  img.onerror = () => {
+    if(useDriveFallback(img)) return;
+    img.style.display = 'none';
+    missing.style.display = 'block';
+    missing.textContent = `${photo.name}\nImage unavailable from GitHub and Google Drive`;
+  };
+  img.onload = () => { missing.style.display = 'none'; img.style.display = 'block'; };
+  img.src = photo.src;
+
+  const carousel = document.getElementById('photo-carousel');
+  carousel.innerHTML = modalPhotos.map((p,i) => `
+    <button class="carousel-thumb ${i===modalIndex?'active':''}" onclick="selectModalPhoto(${i})" title="${p.name}">
+      <img src="${p.src}" alt="${p.name}" data-original-src="${p.src}" data-drive-fallback-tried="0" onerror="if(!useDriveFallback(this)){this.style.display='none';this.nextElementSibling.style.display='flex'}" />
+      <span class="carousel-missing" style="display:none">${p.name}</span>
+    </button>`).join('');
+  requestAnimationFrame(() => carousel.querySelector('.active')?.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'}));
+}
+
+function selectModalPhoto(i){
+  modalIndex = i;
+  renderModalPhoto();
+}
+
+function applyModalTransform(){
+  document.getElementById('photo-modal-image').style.transform = `translate(${modalX}px, ${modalY}px) scale(${modalScale})`;
+}
+
+function resetModalTransform(){
+  modalScale = 1; modalX = 0; modalY = 0;
+  modalPointers.clear();
+  dragStart = null;
+  pinchStartDistance = 0;
+  applyModalTransform();
+}
+
+function zoomModal(factor){
+  modalScale = Math.min(8, Math.max(1, modalScale * factor));
+  if(modalScale === 1){ modalX = 0; modalY = 0; }
+  applyModalTransform();
+}
+
+document.getElementById('photo-modal-close').addEventListener('click', closePhotoModal);
+document.getElementById('zoom-in').addEventListener('click', () => zoomModal(1.35));
+document.getElementById('zoom-out').addEventListener('click', () => zoomModal(1/1.35));
+document.getElementById('zoom-reset').addEventListener('click', resetModalTransform);
+
+document.getElementById('photo-modal-stage').addEventListener('wheel', (e) => {
+  e.preventDefault();
+  zoomModal(e.deltaY < 0 ? 1.15 : 1/1.15);
+}, {passive:false});
+
+document.getElementById('photo-modal-stage').addEventListener('dblclick', () => {
+  if(modalScale > 1) resetModalTransform(); else zoomModal(2);
+});
+
+function pointerDistance(a, b){
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function pointerCenter(a, b){
+  return {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+}
+
+const modalStage = document.getElementById('photo-modal-stage');
+
+modalStage.addEventListener('pointerdown', (e) => {
+  modalPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  e.currentTarget.setPointerCapture(e.pointerId);
+
+  if(modalPointers.size === 2){
+    const [a,b] = [...modalPointers.values()];
+    pinchStartDistance = pointerDistance(a,b);
+    pinchStartScale = modalScale;
+    pinchStartCenter = pointerCenter(a,b);
+    pinchStartOffset = {x:modalX, y:modalY};
+    dragStart = null;
+    e.currentTarget.classList.add('dragging');
+    return;
+  }
+
+  if(modalScale > 1){
+    dragStart = {x:e.clientX, y:e.clientY, ox:modalX, oy:modalY};
+    e.currentTarget.classList.add('dragging');
+  }
+});
+
+modalStage.addEventListener('pointermove', (e) => {
+  if(!modalPointers.has(e.pointerId)) return;
+  modalPointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+
+  if(modalPointers.size >= 2){
+    const [a,b] = [...modalPointers.values()].slice(0,2);
+    const distance = pointerDistance(a,b);
+    const center = pointerCenter(a,b);
+    if(pinchStartDistance > 0){
+      modalScale = Math.min(8, Math.max(1, pinchStartScale * (distance / pinchStartDistance)));
+      modalX = pinchStartOffset.x + (center.x - pinchStartCenter.x);
+      modalY = pinchStartOffset.y + (center.y - pinchStartCenter.y);
+      if(modalScale === 1){ modalX = 0; modalY = 0; }
+      applyModalTransform();
+    }
+    return;
+  }
+
+  if(dragStart && modalScale > 1){
+    modalX = dragStart.ox + (e.clientX - dragStart.x);
+    modalY = dragStart.oy + (e.clientY - dragStart.y);
+    applyModalTransform();
+  }
+});
+
+function endModalPointer(e){
+  modalPointers.delete(e.pointerId);
+  if(modalPointers.size < 2){
+    pinchStartDistance = 0;
+    pinchStartCenter = null;
+    pinchStartOffset = null;
+  }
+  if(modalPointers.size === 1 && modalScale > 1){
+    const [p] = [...modalPointers.values()];
+    dragStart = {x:p.x, y:p.y, ox:modalX, oy:modalY};
+  } else if(modalPointers.size === 0){
+    dragStart = null;
+    e.currentTarget.classList.remove('dragging');
+  }
+}
+modalStage.addEventListener('pointerup', endModalPointer);
+modalStage.addEventListener('pointercancel', endModalPointer);
+
+document.addEventListener('keydown', (e) => {
+  if(!document.getElementById('photo-modal').classList.contains('open')) return;
+  if(e.key === 'Escape') closePhotoModal();
+  if(e.key === 'ArrowRight' && modalPhotos.length){ modalIndex=(modalIndex+1)%modalPhotos.length; renderModalPhoto(); }
+  if(e.key === 'ArrowLeft' && modalPhotos.length){ modalIndex=(modalIndex-1+modalPhotos.length)%modalPhotos.length; renderModalPhoto(); }
+  if(e.key === '+' || e.key === '=') zoomModal(1.25);
+  if(e.key === '-') zoomModal(1/1.25);
+});
+
+renderVideoGrid();
+initMap();
+</script>
+</body>
+</html>
