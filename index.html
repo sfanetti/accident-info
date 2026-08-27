@@ -299,6 +299,39 @@
     cursor:pointer;
   }
 
+  /* Keep the purpose modal usable on small screens without changing desktop behavior. */
+  @media (max-width:600px){
+    #purpose-modal{
+      align-items:flex-start;
+      padding:max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom));
+      overflow-y:auto;
+    }
+    #purpose-modal-card{
+      width:100%;
+      max-height:calc(100dvh - 20px);
+      padding:18px 16px 14px;
+      border-radius:12px;
+      margin:auto 0;
+      -webkit-overflow-scrolling:touch;
+    }
+    #purpose-modal-card h1{font-size:21px;}
+    #purpose-modal-card p{font-size:13px;line-height:1.5;margin-bottom:12px;}
+    #purpose-modal-card .purpose-note{font-size:10px;margin-top:14px;padding:10px 11px;}
+    #purpose-modal-close{
+      position:sticky;
+      bottom:0;
+      margin-top:14px;
+      min-height:44px;
+      box-shadow:0 -10px 20px rgba(18,22,31,0.9);
+    }
+  }
+
+  .crash-audio-popup{min-width:250px;max-width:320px;}
+  .crash-audio-popup .crash-popup-title{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;margin-bottom:6px;}
+  .crash-audio-popup .crash-popup-copy{font-family:'Inter',sans-serif;font-size:12px;line-height:1.45;color:var(--text-dim);margin-bottom:8px;}
+  .crash-audio-popup audio{display:block;width:100%;max-width:300px;}
+  .crash-audio-popup .crash-popup-note{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);margin-top:6px;}
+
 </style>
 </head>
 <body>
@@ -313,16 +346,21 @@
       missing, broken, or otherwise failing.
     </p>
     <p>
-      The concern is straightforward: if a public area remains accessible at night and has
-      installed lighting, it is reasonable to expect that lighting to be maintained so it
-      does not create an unnecessary hazard or leave visitors in dark areas where falls,
-      injuries, or crime are more likely.
+      The City of Cayce describes the Riverwalk as having <strong>12 miles of lighted, paved pathways</strong>.
+      This survey documents a different condition on the ground: numerous installed lights along this
+      route were malfunctioning or not providing usable illumination when observed.
     </p>
     <p>
-      The map, photographs, videos, entrance information, and crash location are presented
-      here as documentation of the conditions observed.
+      The concern is straightforward: if a public path is represented as lighted and the lighting is
+      installed for visibility, widespread failures can leave sections unexpectedly dark and create
+      avoidable hazards for people walking or riding through them.
+    </p>
+    <p>
+      The map, photographs, videos, entrance information, crash location, and accident audio are presented
+      here as documentation of the conditions observed and the incident that occurred on this route.
     </p>
     <div class="purpose-note">
+      City description: “12 miles of lighted, paved pathways.” Source: City of Cayce Riverwalk page.
       This page is intended as factual documentation of observed conditions and locations.
     </div>
     <button id="purpose-modal-close" type="button">View survey</button>
@@ -581,7 +619,16 @@ function initMap(){
       html: `<div class="crash-marker" title="${s.label}">✕</div>`,
       iconSize: [26,26], iconAnchor:[13,13]
     });
-    L.marker([s.lat, s.lng], {icon}).bindPopup(s.label).addTo(map);
+    const crashPopup = `
+      <div class="crash-audio-popup">
+        <div class="crash-popup-title">Crash site</div>
+        <div class="crash-popup-copy">Audio from the accident through the end of the recording.</div>
+        <audio controls preload="metadata" src="accident_to_end.mp3">
+          Your browser does not support embedded audio.
+        </audio>
+        <div class="crash-popup-note">Recorded during the August 7, 2026 incident.</div>
+      </div>`;
+    L.marker([s.lat, s.lng], {icon}).bindPopup(crashPopup, {maxWidth:340}).addTo(map);
     bounds.push([s.lat, s.lng]);
   });
   map.fitBounds(bounds, {padding:[60,60]});
