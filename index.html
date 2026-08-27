@@ -241,9 +241,93 @@
     .carousel-thumb{flex-basis:78px;height:58px;}
   }
 
+
+  /* intro purpose modal */
+  #purpose-modal{
+    position:fixed; inset:0; z-index:4000;
+    display:flex; align-items:center; justify-content:center;
+    padding:20px;
+    background:rgba(5,7,10,0.88);
+    backdrop-filter:blur(4px);
+  }
+  #purpose-modal.closed{display:none;}
+  #purpose-modal-card{
+    width:min(620px, 100%);
+    max-height:min(80vh, 760px);
+    overflow:auto;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    box-shadow:0 24px 80px rgba(0,0,0,0.5);
+    padding:24px;
+  }
+  #purpose-modal-card h1{
+    margin:0 0 12px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:24px;
+    line-height:1.2;
+  }
+  #purpose-modal-card p{
+    margin:0 0 14px;
+    color:var(--text-dim);
+    line-height:1.6;
+    font-size:14px;
+  }
+  #purpose-modal-card strong{color:var(--text);}
+  #purpose-modal-card .purpose-note{
+    margin-top:18px;
+    padding:12px 14px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    background:var(--panel-2);
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    line-height:1.6;
+    color:var(--text-dim);
+  }
+  #purpose-modal-close{
+    margin-top:18px;
+    width:100%;
+    border:1px solid var(--amber);
+    background:var(--amber);
+    color:var(--bg);
+    border-radius:10px;
+    padding:11px 14px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+  }
+
 </style>
 </head>
 <body>
+
+
+<div id="purpose-modal" role="dialog" aria-modal="true" aria-labelledby="purpose-modal-title">
+  <div id="purpose-modal-card">
+    <h1 id="purpose-modal-title">Why this site exists</h1>
+    <p>
+      This site documents <strong>malfunctioning park lights and related conditions</strong>
+      at this public park. The goal is to create a clear visual record of where lighting is
+      missing, broken, or otherwise failing.
+    </p>
+    <p>
+      The concern is straightforward: if a public area remains accessible at night and has
+      installed lighting, it is reasonable to expect that lighting to be maintained so it
+      does not create an unnecessary hazard or leave visitors in dark areas where falls,
+      injuries, or crime are more likely.
+    </p>
+    <p>
+      The map, photographs, videos, entrance information, and crash location are presented
+      here as documentation of the conditions observed.
+    </p>
+    <div class="purpose-note">
+      This page is intended as factual documentation of observed conditions and locations.
+    </div>
+    <button id="purpose-modal-close" type="button">View survey</button>
+  </div>
+</div>
 
 <div id="map"></div>
 <div id="tile-status" style="display:none;position:absolute;top:60px;left:50%;transform:translateX(-50%);z-index:1200;background:#3a1f1f;border:1px solid #7a3a3a;color:#f2c4c4;padding:8px 14px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12px;max-width:80vw;text-align:center;"></div>
@@ -312,6 +396,15 @@
 </div>
 
 <script>
+
+const purposeModal = document.getElementById('purpose-modal');
+const purposeModalClose = document.getElementById('purpose-modal-close');
+if(purposeModal && purposeModalClose){
+  purposeModalClose.addEventListener('click', () => {
+    purposeModal.classList.add('closed');
+  });
+}
+
 const CLUSTERS = [{"id": 1, "lat": 33.94899, "lng": -81.029425, "shots": 1, "filenames": ["20260822_205637.jpg"], "first_seen": "2026:08:22 20:56:37"}, {"id": 2, "lat": 33.949116, "lng": -81.029267, "shots": 2, "filenames": ["20260822_205735.jpg", "20260822_205751.jpg"], "first_seen": "2026:08:22 20:57:37"}, {"id": 3, "lat": 33.947528, "lng": -81.028151, "shots": 2, "filenames": ["20260822_210221.jpg", "20260822_210229.jpg"], "first_seen": "2026:08:22 21:02:23"}, {"id": 4, "lat": 33.945695, "lng": -81.027292, "shots": 1, "filenames": ["20260822_210604.jpg"], "first_seen": "2026:08:22 21:06:06"}, {"id": 5, "lat": 33.945355, "lng": -81.027094, "shots": 1, "filenames": ["20260822_210704.jpg"], "first_seen": "2026:08:22 21:07:06"}, {"id": 6, "lat": 33.944875, "lng": -81.026935, "shots": 1, "filenames": ["20260822_210819.jpg"], "first_seen": "2026:08:22 21:08:21"}, {"id": 7, "lat": 33.943189, "lng": -81.026139, "shots": 3, "filenames": ["20260822_211140.jpg", "20260822_211148.jpg", "20260822_211157.jpg"], "first_seen": "2026:08:22 21:11:42"}, {"id": 8, "lat": 33.942884, "lng": -81.025893, "shots": 2, "filenames": ["20260822_211252.jpg", "20260822_211305.jpg"], "first_seen": "2026:08:22 21:12:54"}, {"id": 9, "lat": 33.942512, "lng": -81.0259, "shots": 1, "filenames": ["20260822_211428.jpg"], "first_seen": "2026:08:22 21:14:31"}, {"id": 10, "lat": 33.941781, "lng": -81.025646, "shots": 1, "filenames": ["20260822_211556.jpg"], "first_seen": "2026:08:22 21:15:58"}, {"id": 11, "lat": 33.940603, "lng": -81.027656, "shots": 3, "filenames": ["20260822_212021.jpg", "20260822_212031.jpg", "20260822_212035.jpg"], "first_seen": "2026:08:22 21:20:23"}, {"id": 12, "lat": 33.939158, "lng": -81.030392, "shots": 1, "filenames": ["20260822_212607.jpg"], "first_seen": "2026:08:22 21:26:09"}, {"id": 13, "lat": 33.9395, "lng": -81.031012, "shots": 1, "filenames": ["20260822_212731.jpg"], "first_seen": "2026:08:22 21:27:34"}, {"id": 14, "lat": 33.939093, "lng": -81.032002, "shots": 2, "filenames": ["20260822_212910.jpg", "20260822_212919.jpg"], "first_seen": "2026:08:22 21:29:13"}, {"id": 15, "lat": 33.937663, "lng": -81.033831, "shots": 1, "filenames": ["20260822_213344.jpg"], "first_seen": "2026:08:22 21:33:46"}, {"id": 16, "lat": 33.937776, "lng": -81.034329, "shots": 2, "filenames": ["20260822_213453.jpg", "20260822_213503.jpg"], "first_seen": "2026:08:22 21:34:55"}, {"id": 17, "lat": 33.938576, "lng": -81.034622, "shots": 3, "filenames": ["20260822_213638.jpg", "20260822_213646.jpg", "20260822_213652.jpg"], "first_seen": "2026:08:22 21:36:40"}, {"id": 18, "lat": 33.938709, "lng": -81.035949, "shots": 1, "filenames": ["20260822_213940.jpg"], "first_seen": "2026:08:22 21:39:42"}, {"id": 19, "lat": 33.938891, "lng": -81.036331, "shots": 1, "filenames": ["20260822_214053.jpg"], "first_seen": "2026:08:22 21:40:56"}, {"id": 20, "lat": 33.93612, "lng": -81.035221, "shots": 1, "filenames": ["20260822_214718.jpg"], "first_seen": "2026:08:22 21:47:20"}, {"id": 21, "lat": 33.935443, "lng": -81.035117, "shots": 1, "filenames": ["20260822_214835.jpg"], "first_seen": "2026:08:22 21:48:38"}, {"id": 22, "lat": 33.935104, "lng": -81.034899, "shots": 2, "filenames": ["20260822_214957.jpg", "20260822_215003.jpg"], "first_seen": "2026:08:22 21:49:59"}, {"id": 23, "lat": 33.935106, "lng": -81.032894, "shots": 4, "filenames": ["20260822_215451.jpg", "20260822_215459.jpg", "20260822_215507.jpg", "20260822_215554.jpg"], "first_seen": "2026:08:22 21:54:54"}, {"id": 24, "lat": 33.935407, "lng": -81.032679, "shots": 1, "filenames": ["20260822_215558.jpg"], "first_seen": "2026:08:22 21:56:00"}, {"id": 25, "lat": 33.936539, "lng": -81.032092, "shots": 2, "filenames": ["20260822_215836.jpg", "20260822_215844.jpg"], "first_seen": "2026:08:22 21:58:38"}, {"id": 26, "lat": 33.937662, "lng": -81.032098, "shots": 1, "filenames": ["20260822_220147.jpg"], "first_seen": "2026:08:22 22:01:50"}, {"id": 27, "lat": 33.938132, "lng": -81.031216, "shots": 1, "filenames": ["20260822_220344.jpg"], "first_seen": "2026:08:22 22:03:46"}, {"id": 28, "lat": 33.937992, "lng": -81.029193, "shots": 1, "filenames": ["20260822_220716.jpg"], "first_seen": "2026:08:22 22:07:18"}, {"id": 29, "lat": 33.938884, "lng": -81.028122, "shots": 1, "filenames": ["20260822_220930.jpg"], "first_seen": "2026:08:22 22:09:32"}];
 const MARKERS_SPECIAL = [
   { id: 'crash', lat: 33.9471807, lng: -81.0280709, label: 'Crash site' }
